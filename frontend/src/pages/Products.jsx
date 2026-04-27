@@ -15,6 +15,7 @@ import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@
 import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import useProductData from "@/components/products/hooks/useProductData"
 
 const initialProducts = [
   { id: "PRD-001", name: "Laptop X13", category: "Tecnologia", stock: 12, price: 1299, status: "top", sku: "LPX13-001", supplier: "TechCore" },
