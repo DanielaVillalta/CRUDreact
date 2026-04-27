@@ -79,12 +79,9 @@ const useUserData = () => {
     const cleanForm = () => {
         setId("");
         setName("");
-        setLastName("");
-        setBirthDate("");
-        setEmail("");
-        setPassword("");
-        setUserType("usuario");
-        setIsVerified(false);
+        setDescription("");
+        setPrice("");
+        setStock("");
     };
 
     const fetchData = async () => {
@@ -260,7 +257,7 @@ const useUserData = () => {
         };
 
         if (!targetId) {
-            const message = "No se encontró el usuario a actualizar";
+            const message = "No se encontró el producto a actualizar";
             setError(message);
             toast.error(message);
             return false;
@@ -312,18 +309,12 @@ const useUserData = () => {
         setId,
         name,
         setName,
-        lastName,
-        setLastName,
-        birthDate,
-        setBirthDate,
-        email,
-        setEmail,
-        password,
-        setPassword,
-        userType,
-        setUserType,
-        isVerified,
-        setIsVerified,
+        description,
+        setDescription,
+        price,
+        setPrice,
+        stock,
+        setStock,
         errorUser,
         setError,
         success,
