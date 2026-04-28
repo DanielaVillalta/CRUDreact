@@ -15,9 +15,10 @@ import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@
 import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import useProductData from "@/components/products/hooks/useProductData"
+import useProductData from "@/components/products/hooks/useProductData";
+import { Textarea } from "@/components/ui/textarea";
 
-const initialProducts = [
+/*const initialProducts = [
   { id: "PRD-001", name: "Laptop X13", category: "Tecnologia", stock: 12, price: 1299, status: "top", sku: "LPX13-001", supplier: "TechCore" },
   { id: "PRD-002", name: "Mouse Pro", category: "Accesorios", stock: 36, price: 39, status: "stable", sku: "MPR-011", supplier: "NovaGear" },
   { id: "PRD-003", name: "Monitor 27\"", category: "Pantallas", stock: 8, price: 349, status: "low", sku: "MON27-022", supplier: "VisionLab" },
@@ -30,10 +31,11 @@ const initialProducts = [
   { id: "PRD-010", name: "Silla Ergo", category: "Mobiliario", stock: 11, price: 249, status: "top", sku: "SER-541", supplier: "OfficeLine" },
   { id: "PRD-011", name: "Router AX", category: "Redes", stock: 16, price: 189, status: "stable", sku: "RAX-300", supplier: "NetCore" },
   { id: "PRD-012", name: "Base Vertical", category: "Accesorios", stock: 5, price: 49, status: "low", sku: "BVE-105", supplier: "NovaGear" },
-];
+];*/
 
 const emptyProductForm = {
   name: "",
+  description: "",
   category: "Accesorios",
   stock: "0",
   price: "",
@@ -88,9 +90,17 @@ const formatPrice = (value) =>
 
 const validateProductForm = (form) => {
   const errors = {};
-  
+
   if (!form.name.trim()) {
     errors.name = "El nombre es requerido";
+  }
+  if (!form.category.trim()) {
+    errors.category = "La categoría es requerida"
+  }
+  if (!form.stock) {
+    errors.stock = "El stock es requerido"
+  } else if (Number(form.stock) < 0) {
+    errors.stock = "El stock debe ser mayor o igual a 0"
   }
   if (!form.price) {
     errors.price = "El precio es requerido";
@@ -100,13 +110,25 @@ const validateProductForm = (form) => {
   if (!form.status) {
     errors.status = "El estado es requerido";
   }
-  
+  if (!form.sku.trim()) {
+    errors.sku = "El SKU es requerido"
+  }
+  if (!form.supplier.trim()) {
+    errors.supplier = "El proveedor es requerido"
+  }
+
   return errors;
 };
 
 function Products() {
-  const [products, setProducts] = useState(initialProducts);
-  const [loading] = useState(false);
+  const {
+    products,
+    loading,
+    errorProduct,
+    handleaSubmit,
+    deleteProduct,
+    handleUpdateSubmit,
+  } = useProductData();
   const [expandedRowId, setExpandedRowId] = useState(null);
   const [currentPage, setCurrentPage] = useState(1);
   const [isCreateOpen, setIsCreateOpen] = useState(false);
@@ -199,14 +221,11 @@ function Products() {
   };
 
   const confirmDelete = () => {
-    if (!deleteTarget) {
-      return;
-    }
+    if (!deleteTarget) return;
 
-    setProducts((prev) => prev.filter((item) => item.id !== deleteTarget.id));
+    deleteProduct(deleteTarget.id);
     setExpandedRowId((prev) => (prev === deleteTarget.id ? null : prev));
     setDeleteTarget(null);
-    toast.success("Producto eliminado correctamente");
   };
 
   const openEditModal = (product) => {
@@ -218,7 +237,7 @@ function Products() {
     setIsEditOpen(true);
   };
 
-  const handleCreateSubmit = (event) => {
+  const handleCreateSubmit = async (event) => {
     event.preventDefault();
     const errors = validateProductForm(createForm);
     setCreateErrors(errors);
@@ -227,53 +246,28 @@ function Products() {
       return;
     }
 
-    const payload = {
-      id: `PRD-${String(Date.now()).slice(-6)}`,
-      name: createForm.name.trim(),
-      category: createForm.category.trim() || "General",
-      stock: Number(createForm.stock) || 0,
-      price: Number(createForm.price) || 0,
-      status: createForm.status,
-      sku: createForm.sku.trim() || "N/A",
-      supplier: createForm.supplier.trim() || "N/A",
-    };
-
-    setProducts((prev) => [payload, ...prev]);
-    setCreateForm(emptyProductForm);
-    setCreateErrors({});
-    setIsCreateOpen(false);
-    toast.success("Producto creado correctamente");
+    const created = await handleaSubmit(createForm);
+    if (created) {
+      setCreateForm(emptyProductForm);
+      setCreateErrors({});
+      setIsCreateOpen(false);
+    }
   };
 
-  const handleEditSubmit = (event) => {
+  const handleEditSubmit = async (event) => {
     event.preventDefault();
-    const errors = validateProductForm(editForm);
+    const errors = validateProductForm(editForm, true);
     setEditErrors(errors);
 
     if (Object.keys(errors).length > 0) {
       return;
     }
 
-    setProducts((prev) =>
-      prev.map((item) =>
-        item.id === editForm.id
-          ? {
-              ...item,
-              name: editForm.name.trim(),
-              category: editForm.category.trim() || "General",
-              stock: Number(editForm.stock) || 0,
-              price: Number(editForm.price) || 0,
-              status: editForm.status,
-              sku: editForm.sku.trim() || "N/A",
-              supplier: editForm.supplier.trim() || "N/A",
-            }
-          : item,
-      ),
-    );
-
-    setIsEditOpen(false);
-    setEditErrors({});
-    toast.success("Producto actualizado correctamente");
+    const updated = await handleUpdateSubmit(editForm, editForm.id);
+    if (updated) {
+      setEditErrors({});
+      setIsEditOpen(false);
+    }
   };
 
   return (
@@ -343,9 +337,8 @@ function Products() {
               <button
                 key={item.key}
                 type="button"
-                className={`inline-flex items-center gap-2 border-b-2 px-1 py-1 text-sm font-semibold transition-colors ${
-                  isActive ? "border-[#822727] text-white" : "border-transparent text-white/55 hover:text-white"
-                }`}
+                className={`inline-flex items-center gap-2 border-b-2 px-1 py-1 text-sm font-semibold transition-colors ${isActive ? "border-[#822727] text-white" : "border-transparent text-white/55 hover:text-white"
+                  }`}
                 onClick={() => setStatusFilter(item.key)}
               >
                 {item.label}
@@ -378,6 +371,11 @@ function Products() {
 
       <Card className="min-h-0 flex-1 border-white/10 bg-[#111111]/90 text-white shadow-[0_18px_50px_rgba(0,0,0,0.2)] backdrop-blur-sm">
         <CardContent className="flex min-h-0 flex-1 flex-col pt-3">
+          {errorProduct ? (
+            <div className="mb-3 rounded-lg border border-rose-500/30 bg-rose-500/10 px-3 py-2 text-sm text-rose-200">
+              {errorProduct}
+            </div>
+          ) : null}
           <div className="scrollbar-invisible min-h-0 flex-1 overflow-auto rounded-2xl border border-white/10 bg-[#151515]">
             <Table>
               <TableHeader className="sticky top-0 z-10 bg-[#151515]">
@@ -397,23 +395,23 @@ function Products() {
               <TableBody>
                 {loading
                   ? Array.from({ length: 6 }, (_, index) => (
-                      <TableRow key={`loading-row-${index}`} className="border-white/10">
-                        <TableCell><Skeleton className="h-4 w-4 rounded-sm bg-white/10" /></TableCell>
-                        <TableCell><Skeleton className="h-4 w-16 bg-white/10" /></TableCell>
-                        <TableCell><Skeleton className="h-4 w-32 bg-white/10" /></TableCell>
-                        <TableCell><Skeleton className="h-4 w-24 bg-white/10" /></TableCell>
-                        <TableCell><Skeleton className="h-4 w-32 bg-white/10" /></TableCell>
-                        <TableCell><Skeleton className="h-4 w-20 bg-white/10" /></TableCell>
-                        <TableCell><Skeleton className="h-6 w-20 rounded-full bg-white/10" /></TableCell>
-                        <TableCell>
-                          <div className="flex items-center justify-end gap-1.5">
-                            <Skeleton className="h-8 w-8 rounded-md bg-white/10" />
-                            <Skeleton className="h-8 w-8 rounded-md bg-white/10" />
-                            <Skeleton className="h-8 w-8 rounded-md bg-white/10" />
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    ))
+                    <TableRow key={`loading-row-${index}`} className="border-white/10">
+                      <TableCell><Skeleton className="h-4 w-4 rounded-sm bg-white/10" /></TableCell>
+                      <TableCell><Skeleton className="h-4 w-16 bg-white/10" /></TableCell>
+                      <TableCell><Skeleton className="h-4 w-32 bg-white/10" /></TableCell>
+                      <TableCell><Skeleton className="h-4 w-24 bg-white/10" /></TableCell>
+                      <TableCell><Skeleton className="h-4 w-32 bg-white/10" /></TableCell>
+                      <TableCell><Skeleton className="h-4 w-20 bg-white/10" /></TableCell>
+                      <TableCell><Skeleton className="h-6 w-20 rounded-full bg-white/10" /></TableCell>
+                      <TableCell>
+                        <div className="flex items-center justify-end gap-1.5">
+                          <Skeleton className="h-8 w-8 rounded-md bg-white/10" />
+                          <Skeleton className="h-8 w-8 rounded-md bg-white/10" />
+                          <Skeleton className="h-8 w-8 rounded-md bg-white/10" />
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))
                   : null}
 
                 {!loading && paginatedProducts.length === 0 ? (
@@ -533,11 +531,10 @@ function Products() {
                   key={page}
                   type="button"
                   variant="outline"
-                  className={`h-9 min-w-9 rounded-full border px-3 text-sm ${
-                    currentPage === page
-                      ? "border-[#822727] bg-[#822727] text-white hover:bg-[#9b2f2f]"
-                      : "border-white/15 bg-transparent text-white/70 hover:bg-white/10 hover:text-white"
-                  }`}
+                  className={`h-9 min-w-9 rounded-full border px-3 text-sm ${currentPage === page
+                    ? "border-[#822727] bg-[#822727] text-white hover:bg-[#9b2f2f]"
+                    : "border-white/15 bg-transparent text-white/70 hover:bg-white/10 hover:text-white"
+                    }`}
                   onClick={() => setCurrentPage(page)}
                 >
                   {page}
@@ -581,6 +578,22 @@ function Products() {
                   aria-invalid={!!createErrors.name}
                 />
                 {createErrors.name && <p className="text-xs text-red-500">{createErrors.name}</p>}
+              </div>
+              <div className="space-y-1.5 sm:col-span-2">
+                <Label htmlFor="create-description">Descripción</Label>
+                <Textarea
+                  id="create-description"
+                  className="h-16"
+                  autoComplete="off"
+                  value={createForm.description}
+                  onChange={(event) => {
+                    setCreateForm((prev) => ({ ...prev, description: event.target.value }));
+                    if (createErrors.description) setCreateErrors((prev) => ({ ...prev, description: "" }));
+                  }}
+                  placeholder=""
+                  aria-invalid={!!createErrors.description}
+                />
+                {createErrors.name && <p className="text-xs text-red-500">{createErrors.description}</p>}
               </div>
               <div className="space-y-1.5">
                 <Label htmlFor="create-category">Categoria</Label>
@@ -627,15 +640,15 @@ function Products() {
               </div>
               <div className="space-y-1.5">
                 <Label htmlFor="create-status">Estado</Label>
-                <Select 
-                  value={createForm.status} 
+                <Select
+                  value={createForm.status}
                   onValueChange={(value) => {
                     setCreateForm((prev) => ({ ...prev, status: value }));
                     if (createErrors.status) setCreateErrors((prev) => ({ ...prev, status: "" }));
                   }}
                 >
-                  <SelectTrigger 
-                    id="create-status" 
+                  <SelectTrigger
+                    id="create-status"
                     size="lg"
                     style={{ height: "44px", paddingTop: "10px", paddingBottom: "10px" }}
                     className="rounded-lg border-white/10 bg-black/20 text-white"
@@ -682,7 +695,9 @@ function Products() {
 
             <div className="flex items-center justify-end gap-2">
               <Button type="button" variant="outline" className="h-11 px-5 text-black" onClick={() => setIsCreateOpen(false)}>Cancelar</Button>
-              <Button type="submit" className="h-11 bg-[#822727] px-5 text-base hover:bg-[#9b2f2f]">Guardar producto</Button>
+              <Button type="submit" disabled={loading} className="h-11 bg-[#822727] px-5 text-base hover:bg-[#9b2f2f]">
+                {loading ? "Guardando..." : "Guardar producto"}
+              </Button>
             </div>
           </form>
         </DialogContent>
@@ -692,7 +707,6 @@ function Products() {
         <DialogContent className="border border-white/10 bg-[#161616] text-white sm:max-w-xl">
           <DialogHeader>
             <DialogTitle>Editar producto</DialogTitle>
-            <DialogDescription className="text-white/55">Ejemplo local sin API: edita y guarda cambios en memoria.</DialogDescription>
           </DialogHeader>
           <form className="space-y-4" onSubmit={handleEditSubmit}>
             <div className="grid gap-3 sm:grid-cols-2">
@@ -710,6 +724,21 @@ function Products() {
                   aria-invalid={!!editErrors.name}
                 />
                 {editErrors.name && <p className="text-xs text-red-500">{editErrors.name}</p>}
+              </div>
+              <div className="space-y-1.5 sm:col-span-2">
+                <Label htmlFor="edit-description">Descripción</Label>
+                <Input
+                  id="edit-description"
+                  className="h-16"
+                  autoComplete="off"
+                  value={editForm.description}
+                  onChange={(event) => {
+                    setEditForm((prev) => ({ ...prev, description: event.target.value }));
+                    if (editErrors.description) setEditErrors((prev) => ({ ...prev, description: "" }));
+                  }}
+                  aria-invalid={!!editErrors.description}
+                />
+                {editErrors.name && <p className="text-xs text-red-500">{editErrors.description}</p>}
               </div>
               <div className="space-y-1.5">
                 <Label htmlFor="edit-category">Categoria</Label>
@@ -754,15 +783,15 @@ function Products() {
               </div>
               <div className="space-y-1.5">
                 <Label htmlFor="edit-status">Estado</Label>
-                <Select 
-                  value={editForm.status} 
+                <Select
+                  value={editForm.status}
                   onValueChange={(value) => {
                     setEditForm((prev) => ({ ...prev, status: value }));
                     if (editErrors.status) setEditErrors((prev) => ({ ...prev, status: "" }));
                   }}
                 >
-                  <SelectTrigger 
-                    id="edit-status" 
+                  <SelectTrigger
+                    id="edit-status"
                     size="lg"
                     style={{ height: "44px", paddingTop: "10px", paddingBottom: "10px" }}
                     className="rounded-lg border-white/10 bg-black/20 text-white"

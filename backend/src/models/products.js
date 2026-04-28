@@ -1,3 +1,15 @@
+/*
+Campos:
+    name
+    description
+    category
+    stock
+    price
+    status
+    sku
+    supplier
+*/
+
 import { Schema, model } from "mongoose"; // importamos Schema y model de Mongoose
 
 // Definimos el esquema de productos con los campos name, description, price y stock
@@ -9,13 +21,30 @@ const productsSchema = new Schema({
     description: { // la descripción del producto es un string opcional
         type: String
     },
+    category: {
+        type: String,
+        required: true
+    },
+    stock: { // el stock del producto es un número requerido
+        type: Number,
+        required: true
+    },
     price: { // el precio del producto es un Decimal128 requerido
         type: Schema.Types.Decimal128,
         required: true
-    }, stock: { // el stock del producto es un número requerido
-        type: Number,
+    },
+    status: {
+        type: String,
         required: true
-    }
+    },
+    sku: {
+        type: String,
+        required: true
+    },
+    supplier: {
+        type: String,
+        required: true
+    },
 }, {
     timestamps: true, // agrega campos createdAt y updatedAt automáticamente
     strict: false // permite guardar campos adicionales que no estén definidos en el esquema (opcional)

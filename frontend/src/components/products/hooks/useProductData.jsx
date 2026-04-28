@@ -2,22 +2,25 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { useAuth } from "@/hooks/useAuth";
 
-const useUserData = () => {
+const useProductData = () => {
     const API_BASE = "http://localhost:3000/api";
-    const API_REGISTER = `${API_BASE}/register`;
-    const API_USERS = `${API_BASE}/users`;
+    const API_PRODUCTS = `${API_BASE}/products`;
     const TOKEN_KEY = "accessToken";
 
     const [activeTab, setActiveTab] = useState("list");
     const [id, setId] = useState("");
     const [name, setName] = useState("");
     const [description, setDescription] = useState("");
-    const [price, setPrice] = useState("");
+    const [category, setCategory] = useState("");
     const [stock, setStock] = useState("");
-    const [errorUser, setError] = useState(null);
+    const [price, setPrice] = useState("");
+    const [status, setStatus] = useState("");
+    const [sku, setSku] = useState("");
+    const [supplier, setSupplier] = useState("");
+    const [errorProduct, setError] = useState(null);
     const [success, setSuccess] = useState(null);
     const [loading, setLoading] = useState(false);
-    const [users, setUsers] = useState([]);
+    const [products, setProducts] = useState([]);
     const { logout } = useAuth();
     const authExpiredHandledRef = useRef(false);
 
@@ -42,29 +45,16 @@ const useUserData = () => {
         return headers;
     };
 
-    const parseBoolean = (value) => {
-        if (typeof value === "boolean") {
-            return value;
-        }
-
-        if (typeof value === "string") {
-            const normalized = value.trim().toLowerCase();
-            return normalized === "true" || normalized === "1";
-        }
-
-        if (typeof value === "number") {
-            return value === 1;
-        }
-
-        return false;
-    };
-
     const normalizeProduct = (apiProduct = {}) => ({
         id: apiProduct._id || apiProduct.id || "",
         name: apiProduct.name || "",
         description: apiProduct.description || "",
-        price: apiProduct.price || "",
-        stock: apiProduct.stock || "",
+        category: apiProduct.category || "",
+        stock: apiProduct.stock || 0,
+        price: parseFloat(apiProduct.price?.toString?.() || 0),
+        status: apiProduct.status || "",
+        sku: apiProduct.sku || "",
+        supplier: apiProduct.supplier || "",
     });
 
     const extractApiPayload = (payload = {}) => {
@@ -80,8 +70,12 @@ const useUserData = () => {
         setId("");
         setName("");
         setDescription("");
-        setPrice("");
-        setStock("");
+        setCategory("Accesorios");
+        setStock(0);
+        setPrice(0);
+        setStatus("Estable");
+        setSku("");
+        setSupplier("");
     };
 
     const fetchData = async () => {
@@ -95,7 +89,7 @@ const useUserData = () => {
                 return;
             }
 
-            const response = await fetch(API_USERS, {
+            const response = await fetch(API_PRODUCTS, {
                 method: "GET",
                 headers: buildHeaders(),
                 credentials: "include",
@@ -109,13 +103,13 @@ const useUserData = () => {
                     await handleUnauthorized();
                     return;
                 }
-                throw new Error(message || "Error al obtener los usuarios");
+                throw new Error(message || "Error al obtener los productos");
             }
 
-            const productsList = Array.isArray(data) ? data.map(normalizeProduct) : [];
-            setUsers(productsList);
+            const productList = Array.isArray(data) ? data.map(normalizeProduct) : [];
+            setProducts(productList);
         } catch (error) {
-            setUsers([]);
+            setProducts([]);
             setError(error.message);
             toast.error(error.message || "Error al obtener los usuarios");
         } finally {
@@ -126,23 +120,42 @@ const useUserData = () => {
     const handleaSubmit = async (formData = null) => {
         const payloadData = formData || {
             name,
-            lastName,
-            birthDate,
-            email,
-            password,
-            userType,
-            isVerified,
+            description,
+            category,
+            stock,
+            price,
+            status,
+            sku,
+            supplier,
         };
 
         const normalizedPayload = {
             name: payloadData.name?.trim() || "",
             description: payloadData.description?.trim() || "",
-            price: payloadData.price || "",
-            stock: payloadData.stock || "",
+            category: payloadData.category?.trim() || "",
+            stock: Number(payloadData.stock) || 0,
+            price: Number(payloadData.price) || 0,
+            status: payloadData.status?.trim() || "",
+            sku: payloadData.sku?.trim() || "",
+            supplier: payloadData.supplier?.trim() || "",
         };
 
-        if (!normalizedPayload.name || !normalizedPayload.description || !normalizedPayload.price || !normalizedPayload.stock) {
-            const message = "Todos los campos deben ser completados";
+        if (!normalizedPayload.name || !normalizedPayload.category || !normalizedPayload.status || !normalizedPayload.sku || !normalizedPayload.supplier) {
+            const message = "Complete todos los campos";
+            setError(message);
+            toast.error(message);
+            return false;
+        }
+
+        if (normalizedPayload.price === 0 || normalizedPayload.price <= 0) {
+            const message = "Ingrese un precio válido";
+            setError(message);
+            toast.error(message);
+            return false;
+        }
+
+        if (normalizedPayload.stock < 0) {
+            const message = "Ingrese un stock válido";
             setError(message);
             toast.error(message);
             return false;
@@ -153,7 +166,7 @@ const useUserData = () => {
         setSuccess(null);
 
         try {
-            const response = await fetch(API_REGISTER, {
+            const response = await fetch(API_PRODUCTS, {
                 method: "POST",
                 headers: buildHeaders(true),
                 body: JSON.stringify(normalizedPayload),
@@ -169,11 +182,11 @@ const useUserData = () => {
                     return false;
                 }
                 const backendErrors = Array.isArray(errors) && errors.length > 0 ? `: ${errors.join(", ")}` : "";
-                throw new Error((message || "Error al registrar el usuario") + backendErrors);
+                throw new Error((message || "Error al agregar el producto") + backendErrors);
             }
 
-            toast.success(message || "Usuario registrado exitosamente");
-            setSuccess(message || "Usuario registrado exitosamente");
+            toast.success(message || "Producto agregado exitosamente");
+            setSuccess(message || "Producto agregado exitosamente");
             cleanForm();
             await fetchData();
             return true;
@@ -190,8 +203,8 @@ const useUserData = () => {
         fetchData();
     }, []);
 
-    const deleteUser = async (userId) => {
-        if (!userId) {
+    const deleteProduct = async (productId) => {
+        if (!productId) {
             return;
         }
 
@@ -200,7 +213,7 @@ const useUserData = () => {
         setSuccess(null);
 
         try {
-            const response = await fetch(`${API_USERS}/${userId}`, {
+            const response = await fetch(`${API_PRODUCTS}/${productId}`, {
                 method: "DELETE",
                 headers: buildHeaders(),
                 credentials: "include",
@@ -214,46 +227,58 @@ const useUserData = () => {
                     await handleUnauthorized();
                     return;
                 }
-                throw new Error(message || "Error al eliminar el usuario");
+                throw new Error(message || "Error al eliminar el producto");
             }
 
-            toast.success(message || "Usuario eliminado exitosamente");
-            setSuccess(message || "Usuario eliminado exitosamente");
+            toast.success(message || "Producto eliminado exitosamente");
+            setSuccess(message || "Producto eliminado exitosamente");
             await fetchData();
         } catch (error) {
             setError(error.message);
-            toast.error(error.message || "Error al eliminar el usuario");
+            toast.error(error.message || "Error al eliminar el producto");
         } finally {
             setLoading(false);
         }
     };
 
-    const updateUser = async (productData) => {
+    const updateProduct = async (productData) => {
         const normalized = normalizeProduct(productData);
         setId(normalized.id);
         setName(normalized.name);
         setDescription(normalized.description);
-        setPrice(normalized.price);
+        setCategory(normalized.category);
         setStock(normalized.stock);
+        setPrice(normalized.price);
+        setStatus(normalized.status);
+        setSku(normalized.sku);
+        setSupplier(normalized.supplier)
         setError(null);
         setSuccess(null);
         setActiveTab("form");
     };
 
-    const handleUpdateSubmit = async (formData = null, userId = null) => {
-        const targetId = userId || id;
+    const handleUpdateSubmit = async (formData = null, productId = null) => {
+        const targetId = productId || id;
         const payloadData = formData || {
             name,
             description,
+            category,
+            stock,
             price,
-            stock
+            status,
+            sku,
+            supplier,
         };
 
         const normalizedPayload = {
             name: payloadData.name?.trim() || "",
             description: payloadData.description?.trim() || "",
-            price: payloadData.price || "",
-            stock: payloadData.stock?.trim() || "",
+            category: payloadData.category?.trim() || "",
+            stock: payloadData.stock?.trim() || 0,
+            price: payloadData.price?.trim() || 0.00,
+            status: payloadData.status?.trim() || "",
+            sku: payloadData.sku?.trim() || "",
+            supplier: payloadData.supplier?.trim() || "",
         };
 
         if (!targetId) {
@@ -268,7 +293,7 @@ const useUserData = () => {
         setSuccess(null);
 
         try {
-            const response = await fetch(`${API_USERS}/${targetId}`, {
+            const response = await fetch(`${API_PRODUCTS}/${targetId}`, {
                 method: "PUT",
                 headers: buildHeaders(true),
                 body: JSON.stringify(normalizedPayload),
@@ -284,18 +309,18 @@ const useUserData = () => {
                     return false;
                 }
                 const backendErrors = Array.isArray(errors) && errors.length > 0 ? `: ${errors.join(", ")}` : "";
-                throw new Error((message || "Error al actualizar el usuario") + backendErrors);
+                throw new Error((message || "Error al actualizar el producto") + backendErrors);
             }
 
-            toast.success(message || "Usuario actualizado exitosamente");
-            setSuccess(message || "Usuario actualizado exitosamente");
+            toast.success(message || "Prodcucto actualizado exitosamente");
+            setSuccess(message || "Producto actualizado exitosamente");
             cleanForm();
             setActiveTab("list");
             await fetchData();
             return true;
         } catch (error) {
             setError(error.message);
-            toast.error(error.message || "Error al actualizar el usuario");
+            toast.error(error.message || "Error al actualizar el producto");
             return false;
         } finally {
             setLoading(false);
@@ -311,25 +336,33 @@ const useUserData = () => {
         setName,
         description,
         setDescription,
-        price,
-        setPrice,
+        category,
+        setCategory,
         stock,
         setStock,
-        errorUser,
+        price,
+        setPrice,
+        status,
+        setStatus,
+        sku,
+        setSku,
+        supplier,
+        setSupplier,
+        errorProduct,
         setError,
         success,
         setSuccess,
         loading,
         setLoading,
-        users,
-        setUsers,
+        products,
+        setProducts,
         cleanForm,
         handleaSubmit,
         fetchData,
-        deleteUser,
-        updateUser,
+        deleteProduct,
+        updateProduct,
         handleUpdateSubmit,
     };
 };
 
-export default useUserData;
+export default useProductData;
